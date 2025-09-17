@@ -278,6 +278,18 @@ class SailNavApp {
         const navData = this.navigation.calculateNavigationData(this.currentPosition);
         if (navData) {
           this.updateWaypointInfo(navData);
+
+          // Update laylines if they're visible and we have wind data
+          if (this.currentPosition && navData.waypoint && this.wind.trueWindSpeed > 0) {
+            const laylines = this.wind.calculateLaylines(
+              this.currentPosition.lat,
+              this.currentPosition.lon,
+              navData.waypoint.lat,
+              navData.waypoint.lon,
+              this.polar
+            );
+            this.map.updateLaylines(laylines, this.currentPosition.lat, this.currentPosition.lon);
+          }
         }
       }
     });
@@ -296,7 +308,11 @@ class SailNavApp {
 
   updateWaypointInfo(navData) {
     document.getElementById('waypoint-info').classList.remove('hidden');
-    document.getElementById('wpt-name').textContent = navData.waypoint.name;
+
+    // Show which leg we're on (e.g., "WPT 2/5")
+    const waypointText = `${navData.waypoint.name} (${navData.activeIndex + 1}/${navData.totalWaypoints})`;
+    document.getElementById('wpt-name').textContent = waypointText;
+
     document.getElementById('dtw').textContent = navData.dtw.toFixed(1);
     document.getElementById('brg').textContent = navData.brg.toString().padStart(3, '0');
     document.getElementById('eta').textContent = navData.eta;
@@ -305,6 +321,16 @@ class SailNavApp {
     // Update steering display if visible
     if (this.steeringVisible) {
       this.updateSteeringDisplay(navData);
+    }
+  }
+
+  skipWaypoint() {
+    if (this.navigation.activeWaypointIndex < this.navigation.waypoints.length - 1) {
+      this.navigation.activeWaypointIndex++;
+      const navData = this.navigation.calculateNavigationData(this.currentPosition);
+      if (navData) {
+        this.updateWaypointInfo(navData);
+      }
     }
   }
 

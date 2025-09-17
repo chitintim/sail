@@ -3,6 +3,7 @@ export class Navigation {
     this.waypoints = [];
     this.activeWaypointIndex = 0;
     this.routeLine = null;
+    this.autoAdvance = true; // Automatically advance to next waypoint when close
   }
 
   addWaypoint(lat, lon, name = null) {
@@ -37,6 +38,11 @@ export class Navigation {
   }
 
   calculateNavigationData(currentPosition) {
+    // Auto-detect closest leg if needed
+    if (this.autoAdvance && this.waypoints.length > 0) {
+      this.updateActiveWaypoint(currentPosition);
+    }
+
     const activeWaypoint = this.getActiveWaypoint();
     if (!activeWaypoint || !currentPosition) {
       return null;
@@ -62,14 +68,70 @@ export class Navigation {
 
     const eta = this.calculateETA(distance, vmg);
 
+    // Check if we've reached the waypoint (within 0.05nm)
+    if (distance < 0.05 && this.activeWaypointIndex < this.waypoints.length - 1) {
+      this.activeWaypointIndex++;
+    }
+
     return {
       waypoint: activeWaypoint,
       dtw: Math.round(distance * 10) / 10,
       brg: Math.round(bearing),
       xte: Math.round(xte * 100) / 100,
       vmg: Math.round(vmg * 10) / 10,
-      eta
+      eta,
+      activeIndex: this.activeWaypointIndex,
+      totalWaypoints: this.waypoints.length
     };
+  }
+
+  updateActiveWaypoint(currentPosition) {
+    if (this.waypoints.length < 2) return;
+
+    let closestLegIndex = 0;
+    let minDistance = Infinity;
+
+    // Find which leg we're closest to
+    for (let i = 0; i < this.waypoints.length - 1; i++) {
+      const fromWpt = this.waypoints[i];
+      const toWpt = this.waypoints[i + 1];
+
+      // Calculate distance to the line between waypoints
+      const distToLeg = this.distanceToLeg(
+        currentPosition,
+        fromWpt,
+        toWpt
+      );
+
+      if (distToLeg < minDistance) {
+        minDistance = distToLeg;
+        closestLegIndex = i + 1; // We navigate TO the second waypoint
+      }
+    }
+
+    // Only update if we're significantly closer to a different leg
+    if (Math.abs(closestLegIndex - this.activeWaypointIndex) > 0 && minDistance < 1.0) {
+      this.activeWaypointIndex = closestLegIndex;
+    }
+  }
+
+  distanceToLeg(position, fromWpt, toWpt) {
+    // Calculate perpendicular distance from position to the line between waypoints
+    const d12 = this.calculateDistance(fromWpt.lat, fromWpt.lon, toWpt.lat, toWpt.lon);
+    const d1p = this.calculateDistance(fromWpt.lat, fromWpt.lon, position.lat, position.lon);
+    const d2p = this.calculateDistance(toWpt.lat, toWpt.lon, position.lat, position.lon);
+
+    // If we're past either end of the leg, use distance to endpoints
+    if (d1p > d12 || d2p > d12) {
+      return Math.min(d1p, d2p);
+    }
+
+    // Otherwise calculate perpendicular distance
+    const bearing12 = this.calculateBearing(fromWpt.lat, fromWpt.lon, toWpt.lat, toWpt.lon);
+    const bearing1p = this.calculateBearing(fromWpt.lat, fromWpt.lon, position.lat, position.lon);
+    const angle = Math.abs(bearing1p - bearing12) * Math.PI / 180;
+
+    return Math.abs(d1p * Math.sin(angle));
   }
 
   calculateDistance(lat1, lon1, lat2, lon2) {
@@ -101,11 +163,21 @@ export class Navigation {
   }
 
   calculateCrossTrackError(currentPosition) {
-    if (this.activeWaypointIndex === 0 || this.waypoints.length < 2) {
+    // For first waypoint or single waypoint, no XTE
+    if (this.waypoints.length < 2) {
       return 0;
     }
 
-    const prevWaypoint = this.waypoints[this.activeWaypointIndex - 1];
+    // Calculate XTE from the line between previous and current waypoint
+    // If we're going to first waypoint, use current position as start
+    let prevWaypoint;
+    if (this.activeWaypointIndex === 0) {
+      // Going to first waypoint - no previous leg to calculate XTE from
+      return 0;
+    } else {
+      prevWaypoint = this.waypoints[this.activeWaypointIndex - 1];
+    }
+
     const activeWaypoint = this.waypoints[this.activeWaypointIndex];
 
     const d13 = this.calculateDistance(
