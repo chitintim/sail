@@ -82,9 +82,22 @@ class SailNavApp {
   }
 
   setupGPSPermission() {
+    console.log('Setting up GPS permission...');
+    console.log('Location:', window.location.href);
+    console.log('Protocol:', window.location.protocol);
+    console.log('Geolocation available:', 'geolocation' in navigator);
+
     // Check if geolocation is available
     if (!('geolocation' in navigator)) {
+      console.error('Geolocation not supported');
       this.showGPSError('GPS not supported on this device');
+      return;
+    }
+
+    // Check if we're on HTTPS (required for geolocation)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      console.error('Not on HTTPS');
+      this.showGPSError('GPS requires HTTPS. Please use https:// URL');
       return;
     }
 
@@ -95,20 +108,35 @@ class SailNavApp {
       <div class="loading-content">
         <h2>Enable GPS</h2>
         <p>To use navigation features, please allow location access</p>
-        <button id="enable-gps" class="action-btn primary" style="width: auto; padding: 12px 24px; margin-top: 20px; border-radius: 8px;">
+        <button id="enable-gps" class="action-btn primary" style="width: auto; padding: 12px 24px; margin-top: 20px; border-radius: 8px; font-size: 16px;">
           Enable GPS
         </button>
-        <p style="margin-top: 20px; font-size: 12px; color: var(--text-secondary);">
-          On iOS: Tap "Enable GPS" then "Allow" when prompted
-        </p>
+        <div style="margin-top: 20px; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
+          <p style="font-size: 12px; color: var(--text-secondary);">
+            Safari will ask for permission after you tap the button
+          </p>
+        </div>
+        <div id="debug-info" style="margin-top: 20px; font-size: 10px; color: var(--text-secondary);"></div>
       </div>
     `;
+
+    // Show debug info
+    const debugEl = document.getElementById('debug-info');
+    if (debugEl) {
+      debugEl.innerHTML = `
+        Protocol: ${window.location.protocol}<br>
+        Host: ${window.location.hostname}<br>
+        Geolocation: ${'geolocation' in navigator ? 'Available' : 'Not Available'}
+      `;
+    }
 
     // Add click handler with a small delay to ensure DOM is ready
     setTimeout(() => {
       const enableBtn = document.getElementById('enable-gps');
       if (enableBtn) {
+        console.log('Adding click listener to Enable GPS button');
         enableBtn.addEventListener('click', () => {
+          console.log('Enable GPS button clicked');
           this.requestGPSPermission();
         });
       } else {
@@ -118,7 +146,7 @@ class SailNavApp {
     }, 100);
   }
 
-  requestGPSPermission() {
+  async requestGPSPermission() {
     const loadingEl = document.getElementById('loading');
     loadingEl.innerHTML = `
       <div class="loading-spinner"></div>
@@ -126,39 +154,61 @@ class SailNavApp {
       <p style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">Please tap "Allow" when prompted</p>
     `;
 
-    // Request permission and get initial position
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        console.log('GPS permission granted:', position.coords);
-        this.setupGPS();
-        this.hideLoading();
-        // Center map on current position
-        this.map.centerOnPosition(position.coords.latitude, position.coords.longitude);
-      },
-      (error) => {
-        console.error('GPS Error:', error.code, error.message);
-        let errorMsg = 'Location access denied';
+    // Check if we have permission first (Safari often returns 'prompt' even if denied)
+    try {
+      if ('permissions' in navigator) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        console.log('Permission status:', permission.state);
 
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMsg = 'Location permission denied. Please enable in Settings > Safari > Location';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMsg = 'Location unavailable. Please ensure Location Services are enabled';
-            break;
-          case error.TIMEOUT:
-            errorMsg = 'Location request timed out. Please try again';
-            break;
-        }
-
-        this.showGPSError(errorMsg);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000, // Increase timeout for slow GPS
-        maximumAge: 0
+        // Add permission state change listener
+        permission.addEventListener('change', () => {
+          console.log('Permission state changed to:', permission.state);
+        });
       }
-    );
+    } catch (e) {
+      console.log('Permissions API not supported or error:', e);
+    }
+
+    // Use setTimeout to work around Safari issues
+    setTimeout(() => {
+      console.log('Attempting to get current position...');
+
+      // Request permission and get initial position
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log('GPS permission granted:', position.coords);
+          this.setupGPS();
+          this.hideLoading();
+          // Center map on current position
+          this.map.centerOnPosition(position.coords.latitude, position.coords.longitude);
+        },
+        (error) => {
+          console.error('GPS Error Code:', error.code);
+          console.error('GPS Error Message:', error.message);
+
+          let errorMsg = 'Location access denied';
+
+          switch(error.code) {
+            case 1: // PERMISSION_DENIED
+              errorMsg = 'Location permission denied. Please enable in Settings > Safari > Location';
+              break;
+            case 2: // POSITION_UNAVAILABLE
+              errorMsg = 'Location unavailable. Please ensure Location Services are enabled';
+              break;
+            case 3: // TIMEOUT
+              errorMsg = 'Location request timed out. Please try again';
+              break;
+          }
+
+          this.showGPSError(errorMsg);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000, // Increase timeout for slow GPS
+          maximumAge: 0
+        }
+      );
+    }, 100); // Small delay to help Safari
   }
 
   showGPSError(message) {
