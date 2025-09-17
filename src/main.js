@@ -38,8 +38,11 @@ class SailNavApp {
       this.windOverlay = new WindOverlay(this.map.leafletMap);
       this.windOverlay.initialize();
 
-      // Set up event listeners
-      this.setupEventListeners();
+      // Set up event listeners after a delay to ensure DOM is ready
+      setTimeout(() => {
+        this.setupEventListeners();
+        console.log('Event listeners set up');
+      }, 100);
 
       console.log('App initialization complete');
 
@@ -52,75 +55,60 @@ class SailNavApp {
   }
 
   setupEventListeners() {
-    document.getElementById('menu-btn').addEventListener('click', () => {
-      document.getElementById('menu-panel').classList.remove('hidden');
+    // Add safe event listener helper
+    const addListener = (id, event, handler) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.addEventListener(event, handler);
+      } else {
+        console.warn(`Element with id '${id}' not found`);
+      }
+    };
+
+    addListener('menu-btn', 'click', () => {
+      console.log('Menu button clicked');
+      const menuPanel = document.getElementById('menu-panel');
+      if (menuPanel) {
+        menuPanel.classList.remove('hidden');
+      }
     });
 
-    document.getElementById('close-menu').addEventListener('click', () => {
-      document.getElementById('menu-panel').classList.add('hidden');
+    addListener('close-menu', 'click', () => {
+      const menuPanel = document.getElementById('menu-panel');
+      if (menuPanel) {
+        menuPanel.classList.add('hidden');
+      }
     });
 
-    document.getElementById('waypoint-btn').addEventListener('click', () => {
+    addListener('waypoint-btn', 'click', () => {
+      console.log('Waypoint button clicked');
       this.toggleWaypointMode();
     });
 
-    document.getElementById('center-btn').addEventListener('click', () => {
+    addListener('center-btn', 'click', () => {
+      console.log('Center button clicked');
       if (this.currentPosition) {
         this.map.centerOnPosition(this.currentPosition.lat, this.currentPosition.lon);
         this.map.setCenterOnBoat(true);
       }
     });
 
-    document.getElementById('new-route').addEventListener('click', () => {
-      this.newRoute();
-    });
+    addListener('new-route', 'click', () => this.newRoute());
+    addListener('save-route', 'click', () => this.saveRoute());
+    addListener('load-route', 'click', () => this.loadRouteDialog());
+    addListener('clear-route', 'click', () => this.clearRoute());
 
-    document.getElementById('save-route').addEventListener('click', () => {
-      this.saveRoute();
-    });
-
-    document.getElementById('load-route').addEventListener('click', () => {
-      this.loadRouteDialog();
-    });
-
-    document.getElementById('clear-route').addEventListener('click', () => {
-      this.clearRoute();
-    });
-
-    document.getElementById('night-mode').addEventListener('change', (e) => {
-      this.setNightMode(e.target.checked);
-    });
-
-    document.getElementById('track-up').addEventListener('change', (e) => {
-      this.map.setTrackUp(e.target.checked);
-    });
-
-    document.getElementById('show-laylines').addEventListener('change', (e) => {
-      this.toggleLaylines(e.target.checked);
-    });
-
-    document.getElementById('show-polars').addEventListener('click', () => {
-      this.togglePerformancePanel();
-    });
-
-    document.getElementById('close-performance')?.addEventListener('click', () => {
-      this.togglePerformancePanel(false);
-    });
-
-    document.getElementById('set-boat').addEventListener('click', () => {
-      this.updateBoatCharacteristics();
-    });
-
-    document.getElementById('show-steering').addEventListener('change', (e) => {
-      this.toggleSteeringDisplay(e.target.checked);
-    });
+    addListener('night-mode', 'change', (e) => this.setNightMode(e.target.checked));
+    addListener('track-up', 'change', (e) => this.map.setTrackUp(e.target.checked));
+    addListener('show-laylines', 'change', (e) => this.toggleLaylines(e.target.checked));
+    addListener('show-polars', 'click', () => this.togglePerformancePanel());
+    addListener('close-performance', 'click', () => this.togglePerformancePanel(false));
+    addListener('set-boat', 'click', () => this.updateBoatCharacteristics());
+    addListener('show-steering', 'change', (e) => this.toggleSteeringDisplay(e.target.checked));
 
     // Weather controls
-    document.getElementById('show-wind').addEventListener('change', (e) => {
-      this.toggleWindOverlay();
-    });
-
-    document.getElementById('auto-routing').addEventListener('change', (e) => {
+    addListener('show-wind', 'change', (e) => this.toggleWindOverlay());
+    addListener('auto-routing', 'change', (e) => {
       this.windRoutingEnabled = e.target.checked;
       this.storage.saveSetting('windRouting', e.target.checked);
       if (e.target.checked) {

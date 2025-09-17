@@ -9,7 +9,7 @@ export class MapController {
     this.routeLine = null;
     this.trackLine = null;
     this.trackUp = false;
-    this.centerOnBoat = true;
+    this.centerOnBoat = false; // Don't auto-center by default
     this.laylines = null;
     this.windArrow = null;
   }
