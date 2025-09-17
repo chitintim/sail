@@ -248,6 +248,13 @@ class SailNavApp {
         // Hide loading screen
         this.hideLoading();
 
+        // Re-setup event listeners now that the app is visible
+        // This ensures buttons work after GPS is enabled
+        setTimeout(() => {
+          console.log('Re-setting up event listeners after GPS enabled');
+          this.setupEventListeners();
+        }, 500);
+
         // Center map on current position
         this.map.centerOnPosition(position.coords.latitude, position.coords.longitude);
 
@@ -283,6 +290,13 @@ class SailNavApp {
   startWithoutGPS() {
     console.log('Starting without GPS...');
     this.hideLoading();
+
+    // Re-setup event listeners now that the app is visible
+    setTimeout(() => {
+      console.log('Re-setting up event listeners after skipping GPS');
+      this.setupEventListeners();
+    }, 500);
+
     // Set a default position (San Francisco Bay)
     this.map.centerOnPosition(37.8095, -122.4095);
   }
@@ -876,6 +890,15 @@ window.app = app; // Make it globally accessible for onclick handlers
 // Add global functions for the buttons
 window.startGPS = () => app.startWithGPS();
 window.skipGPS = () => app.startWithoutGPS();
+
+// Add global handler for menu button as backup
+window.openMenu = () => {
+  console.log('Opening menu via global handler');
+  const menu = document.getElementById('menu-panel');
+  if (menu) {
+    menu.classList.remove('hidden');
+  }
+};
 
 // Initialize the app
 app.init().catch(error => {
