@@ -10,6 +10,8 @@ export class MapController {
     this.trackLine = null;
     this.trackUp = false;
     this.centerOnBoat = true;
+    this.laylines = null;
+    this.windArrow = null;
   }
 
   init(initialLat = 37.7749, initialLon = -122.4194) {
@@ -164,5 +166,92 @@ export class MapController {
 
   getMap() {
     return this.map;
+  }
+
+  updateLaylines(laylineData, boatLat, boatLon) {
+    // Remove existing laylines
+    if (this.laylines) {
+      this.map.removeLayer(this.laylines);
+    }
+
+    if (!laylineData) return;
+
+    // Create layline polylines
+    const portLayline = [
+      [boatLat, boatLon],
+      [laylineData.port.intercept.lat, laylineData.port.intercept.lon]
+    ];
+
+    const starboardLayline = [
+      [boatLat, boatLon],
+      [laylineData.starboard.intercept.lat, laylineData.starboard.intercept.lon]
+    ];
+
+    // Create a feature group for both laylines
+    this.laylines = L.featureGroup([
+      L.polyline(portLayline, {
+        color: '#ef4444',
+        weight: 2,
+        opacity: 0.6,
+        dashArray: '5, 10'
+      }),
+      L.polyline(starboardLayline, {
+        color: '#10b981',
+        weight: 2,
+        opacity: 0.6,
+        dashArray: '5, 10'
+      })
+    ]).addTo(this.map);
+  }
+
+  updateWindArrow(windDirection, lat, lon) {
+    // Remove existing wind arrow
+    if (this.windArrow) {
+      this.map.removeLayer(this.windArrow);
+    }
+
+    // Create wind arrow as a polyline
+    const arrowLength = 0.01; // degrees
+    const arrowEnd = [
+      lat + arrowLength * Math.cos((windDirection - 180) * Math.PI / 180),
+      lon + arrowLength * Math.sin((windDirection - 180) * Math.PI / 180) / Math.cos(lat * Math.PI / 180)
+    ];
+
+    this.windArrow = L.polyline([[lat, lon], arrowEnd], {
+      color: '#3b82f6',
+      weight: 3,
+      opacity: 0.7
+    }).addTo(this.map);
+
+    // Add arrowhead
+    const arrowHeadSize = 0.003;
+    const angle1 = windDirection - 180 + 30;
+    const angle2 = windDirection - 180 - 30;
+
+    const head1 = [
+      arrowEnd[0] + arrowHeadSize * Math.cos(angle1 * Math.PI / 180),
+      arrowEnd[1] + arrowHeadSize * Math.sin(angle1 * Math.PI / 180) / Math.cos(lat * Math.PI / 180)
+    ];
+
+    const head2 = [
+      arrowEnd[0] + arrowHeadSize * Math.cos(angle2 * Math.PI / 180),
+      arrowEnd[1] + arrowHeadSize * Math.sin(angle2 * Math.PI / 180) / Math.cos(lat * Math.PI / 180)
+    ];
+
+    L.polyline([head1, arrowEnd, head2], {
+      color: '#3b82f6',
+      weight: 3,
+      opacity: 0.7
+    }).addTo(this.map);
+  }
+
+  toggleLaylines(show) {
+    if (this.laylines) {
+      if (show) {
+        this.laylines.addTo(this.map);
+      } else {
+        this.map.removeLayer(this.laylines);
+      }
+    }
   }
 }

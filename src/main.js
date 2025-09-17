@@ -2,6 +2,8 @@ import { GPSTracker } from './core/gps.js';
 import { Navigation } from './core/navigation.js';
 import { MapController } from './core/map.js';
 import { Storage } from './data/storage.js';
+import { BoatPolar } from './core/polar.js';
+import { WindCalculator } from './core/wind.js';
 
 class SailNavApp {
   constructor() {
@@ -9,8 +11,11 @@ class SailNavApp {
     this.navigation = new Navigation();
     this.map = new MapController('map');
     this.storage = new Storage();
+    this.polar = new BoatPolar();
+    this.wind = new WindCalculator();
     this.isAddingWaypoint = false;
     this.currentPosition = null;
+    this.performanceVisible = false;
   }
 
   async init() {
@@ -67,6 +72,22 @@ class SailNavApp {
 
     document.getElementById('track-up').addEventListener('change', (e) => {
       this.map.setTrackUp(e.target.checked);
+    });
+
+    document.getElementById('set-wind').addEventListener('click', () => {
+      this.setWind();
+    });
+
+    document.getElementById('show-laylines').addEventListener('change', (e) => {
+      this.toggleLaylines(e.target.checked);
+    });
+
+    document.getElementById('show-polars').addEventListener('click', () => {
+      this.togglePerformancePanel();
+    });
+
+    document.getElementById('close-performance')?.addEventListener('click', () => {
+      this.togglePerformancePanel(false);
     });
 
     this.map.onMapClick((lat, lon) => {
@@ -261,6 +282,8 @@ class SailNavApp {
           data.cog
         );
 
+        this.updatePerformanceMetrics(data);
+
         if (data.track && data.track.length > 1) {
           this.map.updateTrackLine(data.track);
         }
@@ -411,6 +434,81 @@ class SailNavApp {
 
   hideLoading() {
     document.getElementById('loading').classList.add('hidden');
+  }
+
+  setWind() {
+    const speed = parseFloat(document.getElementById('wind-speed').value);
+    const direction = parseFloat(document.getElementById('wind-direction').value);
+
+    if (!isNaN(speed) && !isNaN(direction)) {
+      this.wind.setWind(speed, direction);
+
+      // Update wind arrow on map
+      if (this.currentPosition) {
+        this.map.updateWindArrow(direction, this.currentPosition.lat, this.currentPosition.lon);
+      }
+
+      // Update laylines if active waypoint
+      const activeWaypoint = this.navigation.getActiveWaypoint();
+      if (activeWaypoint && this.currentPosition) {
+        const laylines = this.wind.calculateLaylines(
+          this.currentPosition.lat,
+          this.currentPosition.lon,
+          activeWaypoint.lat,
+          activeWaypoint.lon,
+          this.polar
+        );
+        this.map.updateLaylines(laylines, this.currentPosition.lat, this.currentPosition.lon);
+      }
+
+      document.getElementById('menu-panel').classList.add('hidden');
+    }
+  }
+
+  toggleLaylines(show) {
+    this.map.toggleLaylines(show);
+    this.storage.saveSetting('showLaylines', show);
+  }
+
+  togglePerformancePanel(show = !this.performanceVisible) {
+    const panel = document.getElementById('performance-panel');
+    if (show) {
+      panel.classList.remove('hidden');
+    } else {
+      panel.classList.add('hidden');
+    }
+    this.performanceVisible = show;
+    document.getElementById('menu-panel').classList.add('hidden');
+  }
+
+  updatePerformanceMetrics(gpsData) {
+    if (!this.currentPosition || !gpsData.sog) return;
+
+    const heading = gpsData.cog || 0;
+    const twa = this.wind.getTrueWindAngle(heading);
+    const targetSpeed = this.polar.getTargetSpeed(this.wind.trueWindSpeed, twa);
+    const performance = this.polar.getPerformanceRatio(gpsData.sog, this.wind.trueWindSpeed, twa);
+
+    // Update performance panel if visible
+    if (this.performanceVisible) {
+      document.getElementById('tws').textContent = this.wind.trueWindSpeed.toFixed(0);
+      document.getElementById('twa').textContent = Math.round(twa).toString().padStart(3, '0');
+      document.getElementById('target-speed').textContent = targetSpeed.toFixed(1);
+      document.getElementById('performance').textContent = Math.round(performance).toString();
+    }
+
+    // Calculate true VMG if we have a waypoint
+    const activeWaypoint = this.navigation.getActiveWaypoint();
+    if (activeWaypoint) {
+      const targetBearing = this.wind.calculateBearing(
+        this.currentPosition.lat,
+        this.currentPosition.lon,
+        activeWaypoint.lat,
+        activeWaypoint.lon
+      );
+      const vmg = gpsData.sog * Math.cos((heading - targetBearing) * Math.PI / 180);
+      document.getElementById('vmg').textContent = vmg.toFixed(1);
+    }
   }
 }
 

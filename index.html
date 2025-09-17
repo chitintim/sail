@@ -89,6 +89,26 @@
           <button id="clear-route" class="menu-btn">Clear Route</button>
         </div>
         <div class="menu-section">
+          <h3>Wind</h3>
+          <div class="input-group">
+            <label for="wind-speed">Wind Speed (kts)</label>
+            <input type="number" id="wind-speed" min="0" max="50" step="1" value="10">
+          </div>
+          <div class="input-group">
+            <label for="wind-direction">Wind Direction (°)</label>
+            <input type="number" id="wind-direction" min="0" max="359" step="1" value="0">
+          </div>
+          <button id="set-wind" class="menu-btn">Set Wind</button>
+        </div>
+        <div class="menu-section">
+          <h3>Performance</h3>
+          <button id="show-polars" class="menu-btn">Boat Polars</button>
+          <label class="menu-toggle">
+            <input type="checkbox" id="show-laylines">
+            <span>Show Laylines</span>
+          </label>
+        </div>
+        <div class="menu-section">
           <h3>Display</h3>
           <label class="menu-toggle">
             <input type="checkbox" id="night-mode">
@@ -98,6 +118,35 @@
             <input type="checkbox" id="track-up">
             <span>Track Up</span>
           </label>
+        </div>
+      </div>
+    </div>
+
+    <div id="performance-panel" class="performance-panel hidden">
+      <div class="performance-header">
+        <span>Performance</span>
+        <button id="close-performance" class="close-btn">&times;</button>
+      </div>
+      <div class="performance-content">
+        <div class="perf-item">
+          <span class="perf-label">TWS</span>
+          <span id="tws" class="perf-value">--</span>
+          <span class="perf-unit">kts</span>
+        </div>
+        <div class="perf-item">
+          <span class="perf-label">TWA</span>
+          <span id="twa" class="perf-value">---</span>
+          <span class="perf-unit">°</span>
+        </div>
+        <div class="perf-item">
+          <span class="perf-label">Target</span>
+          <span id="target-speed" class="perf-value">--.-</span>
+          <span class="perf-unit">kts</span>
+        </div>
+        <div class="perf-item">
+          <span class="perf-label">Perf</span>
+          <span id="performance" class="perf-value">---</span>
+          <span class="perf-unit">%</span>
         </div>
       </div>
     </div>
