@@ -20,9 +20,9 @@ class SailNavApp {
     this.map.init();
 
     this.setupEventListeners();
-    this.setupGPS();
 
-    this.hideLoading();
+    // Request GPS permission on user interaction for iOS
+    this.setupGPSPermission();
   }
 
   setupEventListeners() {
@@ -78,6 +78,87 @@ class SailNavApp {
 
     this.map.getMap().on('movestart', () => {
       this.map.setCenterOnBoat(false);
+    });
+  }
+
+  setupGPSPermission() {
+    // Check if geolocation is available
+    if (!('geolocation' in navigator)) {
+      this.showGPSError('GPS not supported on this device');
+      return;
+    }
+
+    // Update loading screen to show GPS permission request
+    const loadingEl = document.getElementById('loading');
+    loadingEl.innerHTML = `
+      <div class="loading-content">
+        <h2>Enable GPS</h2>
+        <p>To use navigation features, please allow location access</p>
+        <button id="enable-gps" class="action-btn primary" style="width: auto; padding: 12px 24px; margin-top: 20px;">
+          Enable GPS
+        </button>
+        <p style="margin-top: 20px; font-size: 12px; color: var(--text-secondary);">
+          iOS: Settings > Safari > Location > Allow
+        </p>
+      </div>
+    `;
+
+    document.getElementById('enable-gps').addEventListener('click', () => {
+      this.requestGPSPermission();
+    });
+  }
+
+  requestGPSPermission() {
+    const loadingEl = document.getElementById('loading');
+    loadingEl.innerHTML = `
+      <div class="loading-spinner"></div>
+      <p>Requesting GPS permission...</p>
+    `;
+
+    // Request permission and get initial position
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        console.log('GPS permission granted');
+        this.setupGPS();
+        this.hideLoading();
+        // Center map on current position
+        this.map.centerOnPosition(position.coords.latitude, position.coords.longitude);
+      },
+      (error) => {
+        console.error('GPS permission denied:', error);
+        this.showGPSError(error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  }
+
+  showGPSError(message) {
+    const loadingEl = document.getElementById('loading');
+    loadingEl.innerHTML = `
+      <div class="loading-content">
+        <h2>GPS Error</h2>
+        <p style="color: var(--danger);">${message}</p>
+        <button id="retry-gps" class="action-btn primary" style="width: auto; padding: 12px 24px; margin-top: 20px;">
+          Retry
+        </button>
+        <button id="continue-without-gps" class="action-btn" style="width: auto; padding: 12px 24px; margin-top: 10px;">
+          Continue Without GPS
+        </button>
+      </div>
+    `;
+
+    document.getElementById('retry-gps')?.addEventListener('click', () => {
+      this.requestGPSPermission();
+    });
+
+    document.getElementById('continue-without-gps')?.addEventListener('click', () => {
+      this.hideLoading();
+      // Set a default position (San Francisco Bay)
+      this.map.centerOnPosition(37.8095, -122.4095);
     });
   }
 
@@ -140,9 +221,22 @@ class SailNavApp {
     if (this.isAddingWaypoint) {
       btn.style.background = '#ef4444';
       document.body.style.cursor = 'crosshair';
+
+      // Show instruction banner
+      const banner = document.createElement('div');
+      banner.id = 'waypoint-banner';
+      banner.className = 'waypoint-banner';
+      banner.innerHTML = 'Tap on the map to add a waypoint';
+      document.getElementById('app').appendChild(banner);
     } else {
       btn.style.background = '';
       document.body.style.cursor = '';
+
+      // Remove instruction banner
+      const banner = document.getElementById('waypoint-banner');
+      if (banner) {
+        banner.remove();
+      }
     }
   }
 
@@ -244,8 +338,9 @@ class SailNavApp {
 const app = new SailNavApp();
 app.init().catch(console.error);
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(console.error);
-  });
-}
+// Service worker registration disabled for development
+// if ('serviceWorker' in navigator && window.location.hostname !== 'localhost') {
+//   window.addEventListener('load', () => {
+//     navigator.serviceWorker.register('/sw.js').catch(console.error);
+//   });
+// }
