@@ -4,6 +4,8 @@ import { MapController } from './core/map.js';
 import { Storage } from './data/storage.js';
 import { BoatPolar } from './core/polar.js';
 import { WindCalculator } from './core/wind.js';
+import { Weather } from './core/weather.js';
+import { WindOverlay } from './core/wind-overlay.js';
 
 class SailNavApp {
   constructor() {
@@ -13,9 +15,12 @@ class SailNavApp {
     this.storage = new Storage();
     this.polar = new BoatPolar();
     this.wind = new WindCalculator();
+    this.weather = new Weather();
+    this.windOverlay = null;
     this.isAddingWaypoint = false;
     this.currentPosition = null;
     this.performanceVisible = false;
+    this.windOverlayVisible = false;
   }
 
   async init() {
@@ -23,6 +28,10 @@ class SailNavApp {
     await this.loadSettings();
 
     this.map.init();
+
+    // Initialize wind overlay
+    this.windOverlay = new WindOverlay(this.map.leafletMap);
+    this.windOverlay.initialize();
 
     this.setupEventListeners();
 
@@ -96,6 +105,30 @@ class SailNavApp {
 
     document.getElementById('show-steering').addEventListener('change', (e) => {
       this.toggleSteeringDisplay(e.target.checked);
+    });
+
+    // Weather controls
+    document.getElementById('fetch-weather').addEventListener('click', () => {
+      if (this.currentPosition) {
+        this.fetchWeatherData(this.currentPosition.lat, this.currentPosition.lon);
+      }
+    });
+
+    document.getElementById('show-wind').addEventListener('change', (e) => {
+      this.toggleWindOverlay();
+    });
+
+    document.getElementById('auto-routing').addEventListener('change', (e) => {
+      this.windRoutingEnabled = e.target.checked;
+      this.storage.saveSetting('windRouting', e.target.checked);
+      if (e.target.checked) {
+        this.updateRoutingWithWind();
+      }
+    });
+
+    document.getElementById('weather-api-key').addEventListener('change', (e) => {
+      this.weather.apiKey = e.target.value;
+      this.storage.saveSetting('weatherApiKey', e.target.value);
     });
 
     this.map.onMapClick((lat, lon) => {
@@ -250,7 +283,7 @@ class SailNavApp {
   }
 
   setupGPS() {
-    this.gps.onUpdate((data) => {
+    this.gps.onUpdate(async (data) => {
       if (data.error) {
         console.error('GPS Error:', data.error);
         return;
@@ -268,6 +301,11 @@ class SailNavApp {
           data.position.lon,
           data.cog
         );
+
+        // Fetch weather data periodically (every 30 minutes or on significant movement)
+        if (!this.lastWeatherFetch || Date.now() - this.lastWeatherFetch > 30 * 60 * 1000) {
+          this.fetchWeatherData(data.position.lat, data.position.lon);
+        }
 
         this.updatePerformanceMetrics(data);
 
@@ -321,6 +359,11 @@ class SailNavApp {
     // Update steering display if visible
     if (this.steeringVisible) {
       this.updateSteeringDisplay(navData);
+    }
+
+    // Check wind routing if enabled
+    if (this.windRoutingEnabled && this.weather.windData) {
+      this.updateRoutingWithWind();
     }
   }
 
@@ -494,6 +537,16 @@ class SailNavApp {
       document.getElementById('track-up').checked = true;
       this.map.setTrackUp(true);
     }
+
+    if (settings.weatherApiKey) {
+      this.weather.apiKey = settings.weatherApiKey;
+      document.getElementById('weather-api-key').value = settings.weatherApiKey;
+    }
+
+    if (settings.windRouting) {
+      this.windRoutingEnabled = settings.windRouting;
+      document.getElementById('auto-routing').checked = settings.windRouting;
+    }
   }
 
   hideLoading() {
@@ -596,6 +649,128 @@ class SailNavApp {
       const vmg = gpsData.sog * Math.cos((heading - targetBearing) * Math.PI / 180);
       document.getElementById('vmg').textContent = vmg.toFixed(1);
     }
+  }
+
+  async fetchWeatherData(lat, lon) {
+    try {
+      const weatherData = await this.weather.fetchWeatherData(lat, lon);
+      this.lastWeatherFetch = Date.now();
+
+      if (weatherData) {
+        // Update wind calculator with real wind data
+        this.wind.setWindSpeed(weatherData.wind.speed);
+        this.wind.setWindDirection(weatherData.wind.direction);
+
+        // Update wind overlay if visible
+        if (this.windOverlayVisible) {
+          const bounds = this.map.leafletMap.getBounds();
+          const windField = await this.weather.fetchWindField({
+            north: bounds.getNorth(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            west: bounds.getWest()
+          });
+          this.windOverlay.setWindData(windField);
+        }
+
+        // Update display with wind info
+        this.updateWindDisplay(weatherData.wind);
+      }
+    } catch (error) {
+      console.error('Weather fetch error:', error);
+    }
+  }
+
+  updateWindDisplay(windData) {
+    // Update TWS display if performance panel is visible
+    if (this.performanceVisible) {
+      document.getElementById('tws').textContent = Math.round(windData.speed);
+    }
+
+    // Calculate TWA if we have COG
+    if (this.currentPosition?.cog) {
+      const twa = this.weather.calculateTWA(this.currentPosition.cog, windData.direction);
+      if (this.performanceVisible) {
+        document.getElementById('twa').textContent = Math.round(twa);
+      }
+
+      // Check if in no-go zone and update steering display
+      if (this.weather.isInNoGoZone(this.currentPosition.cog, windData.direction)) {
+        // Add visual indicator for no-go zone
+        this.showNoGoWarning();
+      }
+    }
+  }
+
+  showNoGoWarning() {
+    // Visual warning that boat is pointing too close to wind
+    const banner = document.createElement('div');
+    banner.className = 'waypoint-banner';
+    banner.style.background = '#f59e0b';
+    banner.textContent = 'Too close to wind - consider tacking';
+    banner.id = 'no-go-warning';
+
+    const existing = document.getElementById('no-go-warning');
+    if (existing) {
+      existing.remove();
+    }
+
+    document.getElementById('app').appendChild(banner);
+
+    setTimeout(() => {
+      banner.remove();
+    }, 5000);
+  }
+
+  toggleWindOverlay() {
+    this.windOverlayVisible = !this.windOverlayVisible;
+
+    if (this.windOverlayVisible) {
+      // Fetch fresh wind data
+      if (this.currentPosition) {
+        this.fetchWeatherData(this.currentPosition.lat, this.currentPosition.lon);
+      }
+      this.windOverlay.show();
+    } else {
+      this.windOverlay.hide();
+    }
+  }
+
+  updateRoutingWithWind() {
+    // Update navigation to consider wind when calculating routes
+    const activeWaypoint = this.navigation.getActiveWaypoint();
+    if (activeWaypoint && this.currentPosition && this.weather.windData) {
+      const optimalRoute = this.weather.calculateOptimalTack(
+        this.currentPosition,
+        activeWaypoint,
+        this.weather.windData.wind.direction,
+        this.polar.boatType
+      );
+
+      if (optimalRoute.needsTacking) {
+        // Show tacking recommendation
+        this.showTackingAdvice(optimalRoute);
+      }
+    }
+  }
+
+  showTackingAdvice(route) {
+    const banner = document.createElement('div');
+    banner.className = 'waypoint-banner';
+    banner.style.background = '#1e40af';
+    banner.textContent = `Tack to ${route.recommendedTack} - steer ${Math.round(route.courseToSteer)}°`;
+    banner.id = 'tacking-advice';
+
+    const existing = document.getElementById('tacking-advice');
+    if (existing) {
+      existing.remove();
+    }
+
+    document.getElementById('app').appendChild(banner);
+
+    setTimeout(() => {
+      banner.remove();
+    }, 10000);
   }
 }
 
