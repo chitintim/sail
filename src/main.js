@@ -24,6 +24,14 @@ class SailNavApp {
   }
 
   async init() {
+    console.log('App initializing...');
+
+    // Make sure loading screen is visible
+    const loadingEl = document.getElementById('loading');
+    if (loadingEl) {
+      loadingEl.classList.remove('hidden');
+    }
+
     await this.storage.init();
     await this.loadSettings();
 
@@ -35,7 +43,8 @@ class SailNavApp {
 
     this.setupEventListeners();
 
-    // Show the GPS permission UI immediately
+    // Show the GPS permission UI immediately - this should replace the loading spinner
+    console.log('Showing GPS permission UI...');
     this.showGPSPermissionUI();
   }
 
@@ -129,10 +138,19 @@ class SailNavApp {
   }
 
   showGPSPermissionUI() {
-    // Don't check anything first, just show the UI immediately
-    const loadingEl = document.getElementById('loading');
+    console.log('showGPSPermissionUI called');
 
-    // Always show the permission UI right away
+    // Get the loading element
+    const loadingEl = document.getElementById('loading');
+    if (!loadingEl) {
+      console.error('Loading element not found!');
+      return;
+    }
+
+    // Make sure it's visible
+    loadingEl.classList.remove('hidden');
+
+    // Replace content with permission UI
     loadingEl.innerHTML = `
       <div class="loading-content">
         <h2>Sail Navigation</h2>
@@ -316,70 +334,6 @@ class SailNavApp {
     );
   }
 
-  async requestGPSPermission() {
-    const loadingEl = document.getElementById('loading');
-    loadingEl.innerHTML = `
-      <div class="loading-spinner"></div>
-      <p>Requesting GPS permission...</p>
-      <p style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">Please tap "Allow" when prompted</p>
-    `;
-
-    // Check if we have permission first (Safari often returns 'prompt' even if denied)
-    try {
-      if ('permissions' in navigator) {
-        const permission = await navigator.permissions.query({ name: 'geolocation' });
-        console.log('Permission status:', permission.state);
-
-        // Add permission state change listener
-        permission.addEventListener('change', () => {
-          console.log('Permission state changed to:', permission.state);
-        });
-      }
-    } catch (e) {
-      console.log('Permissions API not supported or error:', e);
-    }
-
-    // Use setTimeout to work around Safari issues
-    setTimeout(() => {
-      console.log('Attempting to get current position...');
-
-      // Request permission and get initial position
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log('GPS permission granted:', position.coords);
-          this.setupGPS();
-          this.hideLoading();
-          // Center map on current position
-          this.map.centerOnPosition(position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          console.error('GPS Error Code:', error.code);
-          console.error('GPS Error Message:', error.message);
-
-          let errorMsg = 'Location access denied';
-
-          switch(error.code) {
-            case 1: // PERMISSION_DENIED
-              errorMsg = 'Location permission denied. Please enable in Settings > Safari > Location';
-              break;
-            case 2: // POSITION_UNAVAILABLE
-              errorMsg = 'Location unavailable. Please ensure Location Services are enabled';
-              break;
-            case 3: // TIMEOUT
-              errorMsg = 'Location request timed out. Please try again';
-              break;
-          }
-
-          this.showGPSError(errorMsg);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 15000, // Increase timeout for slow GPS
-          maximumAge: 0
-        }
-      );
-    }, 100); // Small delay to help Safari
-  }
 
   showGPSError(message) {
     const loadingEl = document.getElementById('loading');
@@ -388,10 +342,10 @@ class SailNavApp {
       <div class="loading-content">
         <h2>GPS Issue</h2>
         <p style="margin: 20px 0;">${message}</p>
-        <button onclick="window.app.startWithGPS()" style="width: 200px; padding: 16px 24px; margin-top: 20px; border-radius: 8px; font-size: 18px; background: #1e40af; color: white; border: none; cursor: pointer;">
+        <button id="retry-gps-btn" style="width: 200px; padding: 16px 24px; margin-top: 20px; border-radius: 8px; font-size: 18px; background: #1e40af; color: white; border: none; cursor: pointer;">
           Try Again
         </button>
-        <button onclick="window.app.startWithoutGPS()" style="width: 200px; padding: 14px 24px; margin-top: 10px; border-radius: 8px; font-size: 16px; background: #6b7280; color: white; border: none; cursor: pointer;">
+        <button id="skip-gps-error-btn" style="width: 200px; padding: 14px 24px; margin-top: 10px; border-radius: 8px; font-size: 16px; background: #6b7280; color: white; border: none; cursor: pointer;">
           Continue Without GPS
         </button>
         <div style="margin-top: 30px; padding: 15px; background: rgba(0,0,0,0.05); border-radius: 8px;">
@@ -399,6 +353,19 @@ class SailNavApp {
         </div>
       </div>
     `;
+
+    // Add event listeners
+    setTimeout(() => {
+      const retryBtn = document.getElementById('retry-gps-btn');
+      const skipBtn = document.getElementById('skip-gps-error-btn');
+
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => this.startWithGPS(), { once: true });
+      }
+      if (skipBtn) {
+        skipBtn.addEventListener('click', () => this.startWithoutGPS(), { once: true });
+      }
+    }, 100);
   }
 
   setupGPS() {
