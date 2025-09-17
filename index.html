@@ -205,7 +205,18 @@
     <div id="loading" class="loading-screen">
       <div class="loading-content">
         <h2>Sail Navigation</h2>
-        <p>Loading...</p>
+        <p>Enable GPS for real-time navigation</p>
+        <button onclick="window.startGPS && window.startGPS()" style="width: 200px; padding: 16px 24px; margin-top: 20px; border-radius: 8px; font-size: 18px; background: #1e40af; color: white; border: none; cursor: pointer;">
+          Enable GPS
+        </button>
+        <button onclick="window.skipGPS && window.skipGPS()" style="width: 200px; padding: 14px 24px; margin-top: 10px; border-radius: 8px; font-size: 16px; background: #6b7280; color: white; border: none; cursor: pointer;">
+          Continue Without GPS
+        </button>
+        <div style="margin-top: 30px; padding: 15px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+          <p style="font-size: 14px; font-weight: bold;">Troubleshooting:</p>
+          <p style="font-size: 12px;">• Access via: https://chitintim.github.io/sail/</p>
+          <p style="font-size: 12px;">• iOS: Settings > Safari > Location > Allow</p>
+        </div>
       </div>
     </div>
   </div>

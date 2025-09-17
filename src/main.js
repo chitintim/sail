@@ -26,26 +26,29 @@ class SailNavApp {
   async init() {
     console.log('App initializing...');
 
-    // Make sure loading screen is visible
-    const loadingEl = document.getElementById('loading');
-    if (loadingEl) {
-      loadingEl.classList.remove('hidden');
+    try {
+      // Initialize storage and settings
+      await this.storage.init();
+      await this.loadSettings();
+
+      // Initialize map
+      this.map.init();
+
+      // Initialize wind overlay
+      this.windOverlay = new WindOverlay(this.map.leafletMap);
+      this.windOverlay.initialize();
+
+      // Set up event listeners
+      this.setupEventListeners();
+
+      console.log('App initialization complete');
+
+      // The loading screen with buttons is already showing from HTML
+      // User needs to click Enable GPS or Continue Without GPS
+    } catch (error) {
+      console.error('Error during initialization:', error);
+      // Keep showing the loading screen with buttons
     }
-
-    await this.storage.init();
-    await this.loadSettings();
-
-    this.map.init();
-
-    // Initialize wind overlay
-    this.windOverlay = new WindOverlay(this.map.leafletMap);
-    this.windOverlay.initialize();
-
-    this.setupEventListeners();
-
-    // Show the GPS permission UI immediately - this should replace the loading spinner
-    console.log('Showing GPS permission UI...');
-    this.showGPSPermissionUI();
   }
 
   setupEventListeners() {
@@ -180,11 +183,14 @@ class SailNavApp {
       debugEl.textContent = `Protocol: ${window.location.protocol}, Host: ${window.location.hostname}`;
     }
 
-    // Add event listeners after DOM is updated
-    setTimeout(() => {
+    // Add event listeners immediately
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
       const enableBtn = document.getElementById('enable-gps-btn');
       const skipBtn = document.getElementById('skip-gps-btn');
       const testBtn = document.getElementById('test-gps-btn');
+
+      console.log('Setting up button listeners:', { enableBtn: !!enableBtn, skipBtn: !!skipBtn, testBtn: !!testBtn });
 
       if (enableBtn) {
         enableBtn.addEventListener('click', () => {
@@ -206,7 +212,7 @@ class SailNavApp {
           this.testGPSPermission();
         });
       }
-    }, 100);
+    });
   }
 
   startWithGPS() {
@@ -878,7 +884,17 @@ class SailNavApp {
 
 const app = new SailNavApp();
 window.app = app; // Make it globally accessible for onclick handlers
-app.init().catch(console.error);
+
+// Add global functions for the buttons
+window.startGPS = () => app.startWithGPS();
+window.skipGPS = () => app.startWithoutGPS();
+
+// Initialize the app
+app.init().catch(error => {
+  console.error('Failed to initialize app:', error);
+  // If init fails, still set up the basic functions
+  document.getElementById('loading').style.display = 'block';
+});
 
 // Service worker registration disabled for development
 // if ('serviceWorker' in navigator && window.location.hostname !== 'localhost') {
