@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1e40af">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Sail Navigation</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <div id="data-bar" class="data-bar">
+      <div class="data-item">
+        <span class="data-label">SOG</span>
+        <span id="sog" class="data-value">--.-</span>
+        <span class="data-unit">kts</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">COG</span>
+        <span id="cog" class="data-value">---</span>
+        <span class="data-unit">°</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">VMG</span>
+        <span id="vmg" class="data-value">--.-</span>
+        <span class="data-unit">kts</span>
+      </div>
+    </div>
+
+    <div id="map" class="map-container"></div>
+
+    <div id="waypoint-info" class="waypoint-info hidden">
+      <div class="waypoint-item">
+        <span class="waypoint-label">WPT</span>
+        <span id="wpt-name" class="waypoint-value">---</span>
+      </div>
+      <div class="waypoint-item">
+        <span class="waypoint-label">DTW</span>
+        <span id="dtw" class="waypoint-value">--.-</span>
+        <span class="waypoint-unit">nm</span>
+      </div>
+      <div class="waypoint-item">
+        <span class="waypoint-label">BRG</span>
+        <span id="brg" class="waypoint-value">---</span>
+        <span class="waypoint-unit">°</span>
+      </div>
+      <div class="waypoint-item">
+        <span class="waypoint-label">ETA</span>
+        <span id="eta" class="waypoint-value">--:--</span>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button id="menu-btn" class="action-btn" aria-label="Menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <button id="waypoint-btn" class="action-btn primary" aria-label="Add Waypoint">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+      <button id="center-btn" class="action-btn" aria-label="Center on Position">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </button>
+    </div>
+
+    <div id="menu-panel" class="menu-panel hidden">
+      <div class="menu-header">
+        <h2>Menu</h2>
+        <button id="close-menu" class="close-btn">&times;</button>
+      </div>
+      <div class="menu-content">
+        <div class="menu-section">
+          <h3>Routes</h3>
+          <button id="new-route" class="menu-btn">New Route</button>
+          <button id="load-route" class="menu-btn">Load Route</button>
+          <button id="save-route" class="menu-btn">Save Route</button>
+          <button id="clear-route" class="menu-btn">Clear Route</button>
+        </div>
+        <div class="menu-section">
+          <h3>Display</h3>
+          <label class="menu-toggle">
+            <input type="checkbox" id="night-mode">
+            <span>Night Mode</span>
+          </label>
+          <label class="menu-toggle">
+            <input type="checkbox" id="track-up">
+            <span>Track Up</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div id="loading" class="loading-screen">
+      <div class="loading-spinner"></div>
+      <p>Acquiring GPS position...</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
