@@ -137,35 +137,128 @@ class SailNavApp {
       <div class="loading-content">
         <h2>Sail Navigation</h2>
         <p>Enable GPS for real-time navigation</p>
-        <button id="enable-gps" onclick="window.app.startWithGPS()" style="width: 200px; padding: 16px 24px; margin-top: 20px; border-radius: 8px; font-size: 18px; background: #1e40af; color: white; border: none; cursor: pointer;">
+        <button id="enable-gps-btn" style="width: 200px; padding: 16px 24px; margin-top: 20px; border-radius: 8px; font-size: 18px; background: #1e40af; color: white; border: none; cursor: pointer;">
           Enable GPS
         </button>
-        <button id="skip-gps" onclick="window.app.startWithoutGPS()" style="width: 200px; padding: 14px 24px; margin-top: 10px; border-radius: 8px; font-size: 16px; background: #6b7280; color: white; border: none; cursor: pointer;">
+        <button id="skip-gps-btn" style="width: 200px; padding: 14px 24px; margin-top: 10px; border-radius: 8px; font-size: 16px; background: #6b7280; color: white; border: none; cursor: pointer;">
           Continue Without GPS
         </button>
+        <button id="test-gps-btn" style="width: 200px; padding: 12px 20px; margin-top: 10px; border-radius: 8px; font-size: 14px; background: #10b981; color: white; border: none; cursor: pointer;">
+          Test GPS Permission
+        </button>
+        <div style="margin-top: 30px; padding: 15px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+          <p style="font-size: 14px; font-weight: bold;">Troubleshooting:</p>
+          <p style="font-size: 12px;">• Access via: https://chitintim.github.io/sail/</p>
+          <p style="font-size: 12px;">• iOS: Settings > Safari > Location > Allow</p>
+          <p style="font-size: 12px;">• Clear Safari cache if stuck</p>
+          <p id="debug-info" style="font-size: 11px; color: #666; margin-top: 10px;"></p>
+        </div>
       </div>
     `;
+
+    // Show debug info
+    const debugEl = document.getElementById('debug-info');
+    if (debugEl) {
+      debugEl.textContent = `Protocol: ${window.location.protocol}, Host: ${window.location.hostname}`;
+    }
+
+    // Add event listeners after DOM is updated
+    setTimeout(() => {
+      const enableBtn = document.getElementById('enable-gps-btn');
+      const skipBtn = document.getElementById('skip-gps-btn');
+      const testBtn = document.getElementById('test-gps-btn');
+
+      if (enableBtn) {
+        enableBtn.addEventListener('click', () => {
+          console.log('Enable GPS button clicked');
+          this.startWithGPS();
+        }, { once: true });
+      }
+
+      if (skipBtn) {
+        skipBtn.addEventListener('click', () => {
+          console.log('Skip GPS button clicked');
+          this.startWithoutGPS();
+        }, { once: true });
+      }
+
+      if (testBtn) {
+        testBtn.addEventListener('click', () => {
+          console.log('Testing GPS...');
+          this.testGPSPermission();
+        });
+      }
+    }, 100);
   }
 
   startWithGPS() {
     console.log('Starting with GPS...');
     const loadingEl = document.getElementById('loading');
+
+    // Check if geolocation is available
+    if (!navigator.geolocation) {
+      this.showGPSError('Geolocation is not supported by your browser. Please use Safari on iOS or Chrome on Android.');
+      return;
+    }
+
+    // Check if we're on HTTPS (required for iOS)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      this.showGPSError('GPS requires HTTPS. Please access this app via https:// or from the deployed GitHub Pages site.');
+      return;
+    }
+
     loadingEl.innerHTML = `
       <div class="loading-spinner"></div>
       <p>Requesting GPS permission...</p>
+      <p style="font-size: 12px; margin-top: 10px;">If nothing happens, check Settings > Safari > Location</p>
     `;
 
-    // Request GPS permission
+    console.log('Calling getCurrentPosition...');
+
+    // Request GPS permission with a single position first
     navigator.geolocation.getCurrentPosition(
       (position) => {
         console.log('GPS enabled successfully');
+
+        // Setup GPS callbacks
         this.setupGPS();
+
+        // START the actual GPS tracking - this was missing!
+        try {
+          this.gps.start();
+          console.log('GPS tracking started');
+        } catch (error) {
+          console.error('Failed to start GPS tracking:', error);
+          this.showGPSError(`Failed to start GPS tracking: ${error.message}`);
+          return;
+        }
+
+        // Hide loading screen
         this.hideLoading();
+
+        // Center map on current position
         this.map.centerOnPosition(position.coords.latitude, position.coords.longitude);
+
+        // Also fetch initial weather
+        this.fetchWeatherData(position.coords.latitude, position.coords.longitude);
       },
       (error) => {
         console.error('GPS error:', error);
-        this.showGPSError(`GPS Error: ${error.message}. You can retry or continue without GPS.`);
+        let errorMessage = 'GPS Error: ';
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Permission denied. Please enable location access in Settings > Safari > Location.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Position unavailable. Make sure location services are enabled.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Request timed out. Please try again.';
+            break;
+          default:
+            errorMessage += error.message;
+        }
+        this.showGPSError(errorMessage);
       },
       {
         enableHighAccuracy: true,
@@ -180,6 +273,47 @@ class SailNavApp {
     this.hideLoading();
     // Set a default position (San Francisco Bay)
     this.map.centerOnPosition(37.8095, -122.4095);
+  }
+
+  testGPSPermission() {
+    const debugEl = document.getElementById('debug-info');
+
+    if (!navigator.geolocation) {
+      alert('Geolocation not available in your browser!');
+      return;
+    }
+
+    if (debugEl) {
+      debugEl.innerHTML = 'Testing GPS... requesting permission now...';
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const msg = `GPS works! Lat: ${position.coords.latitude.toFixed(4)}, Lon: ${position.coords.longitude.toFixed(4)}`;
+        alert(msg);
+        if (debugEl) {
+          debugEl.innerHTML = msg;
+        }
+      },
+      (error) => {
+        let msg = 'GPS Error: ';
+        switch(error.code) {
+          case 1: msg += 'Permission Denied - Check Settings'; break;
+          case 2: msg += 'Position Unavailable'; break;
+          case 3: msg += 'Timeout'; break;
+          default: msg += error.message;
+        }
+        alert(msg);
+        if (debugEl) {
+          debugEl.innerHTML = msg;
+        }
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    );
   }
 
   async requestGPSPermission() {
