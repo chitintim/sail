@@ -369,7 +369,8 @@ html, body {
   margin-bottom: 0.25rem;
 }
 
-.input-group input {
+.input-group input,
+.input-group select {
   width: 100%;
   padding: 0.5rem;
   border: 1px solid var(--border);
@@ -434,6 +435,121 @@ html, body {
   font-size: 0.75rem;
   color: var(--text-secondary);
   width: 25px;
+}
+
+.steering-display {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  padding: 0.75rem;
+  z-index: 999;
+}
+
+.xte-indicator {
+  margin-bottom: 0.75rem;
+}
+
+.xte-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.625rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.xte-bar {
+  position: relative;
+  height: 30px;
+  background: linear-gradient(90deg,
+    #ef4444 0%,
+    #f59e0b 25%,
+    #10b981 45%,
+    #10b981 55%,
+    #f59e0b 75%,
+    #ef4444 100%);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.xte-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--text-primary);
+  transform: translateX(-50%);
+}
+
+.xte-marker {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 4px;
+  background: var(--primary);
+  border: 2px solid white;
+  border-radius: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: left 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.xte-label {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.xte-label span:nth-child(2) {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.steering-guidance {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.steer-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.steer-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.steer-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.steer-arrow {
+  flex: 1;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+}
+
+.steer-arrow.port {
+  background: linear-gradient(90deg, #ef4444 0%, transparent 100%);
+  color: white;
+}
+
+.steer-arrow.starboard {
+  background: linear-gradient(90deg, transparent 0%, #10b981 100%);
+  color: white;
 }
 
 @media (min-width: 768px) {

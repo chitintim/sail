@@ -90,6 +90,14 @@ class SailNavApp {
       this.togglePerformancePanel(false);
     });
 
+    document.getElementById('set-boat').addEventListener('click', () => {
+      this.updateBoatCharacteristics();
+    });
+
+    document.getElementById('show-steering').addEventListener('change', (e) => {
+      this.toggleSteeringDisplay(e.target.checked);
+    });
+
     this.map.onMapClick((lat, lon) => {
       if (this.isAddingWaypoint) {
         this.addWaypoint(lat, lon);
@@ -314,6 +322,57 @@ class SailNavApp {
     document.getElementById('brg').textContent = navData.brg.toString().padStart(3, '0');
     document.getElementById('eta').textContent = navData.eta;
     document.getElementById('vmg').textContent = navData.vmg.toFixed(1);
+
+    // Update steering display if visible
+    if (this.steeringVisible) {
+      this.updateSteeringDisplay(navData);
+    }
+  }
+
+  updateSteeringDisplay(navData) {
+    // Calculate course to steer
+    const xte = navData.xte || 0;
+    const brg = navData.brg;
+    const cog = this.currentPosition?.cog || 0;
+
+    // Simple course correction: adjust bearing based on XTE
+    // For every 0.1nm off track, adjust 5 degrees (adjustable)
+    const xteCorrection = Math.min(Math.max(xte * 50, -30), 30); // Max 30 degree correction
+    const courseToSteer = Math.round((brg + xteCorrection + 360) % 360);
+
+    // Update XTE bar position (scale: -1nm to +1nm)
+    const xtePosition = Math.min(Math.max(xte / 1, -1), 1); // Normalize to -1 to 1
+    const xtePercent = 50 + (xtePosition * 45); // Convert to percentage (5% to 95%)
+
+    const xteMarker = document.getElementById('xte-marker');
+    xteMarker.style.left = `${xtePercent}%`;
+
+    // Update XTE value
+    const xteValue = document.getElementById('xte-value');
+    const xteDirection = xte > 0 ? 'STBD' : xte < 0 ? 'PORT' : '';
+    xteValue.textContent = `XTE: ${Math.abs(xte).toFixed(2)}nm ${xteDirection}`;
+
+    // Update course to steer
+    document.getElementById('cts').textContent = `${courseToSteer}°`;
+
+    // Calculate steering direction
+    let angleDiff = courseToSteer - cog;
+    while (angleDiff > 180) angleDiff -= 360;
+    while (angleDiff < -180) angleDiff += 360;
+
+    const steerArrow = document.getElementById('steer-arrow');
+    const steerDirection = document.getElementById('steer-direction');
+
+    if (Math.abs(angleDiff) < 5) {
+      steerArrow.className = 'steer-arrow';
+      steerDirection.textContent = 'ON COURSE';
+    } else if (angleDiff > 0) {
+      steerArrow.className = 'steer-arrow starboard';
+      steerDirection.textContent = `TURN ${Math.abs(angleDiff).toFixed(0)}° STARBOARD`;
+    } else {
+      steerArrow.className = 'steer-arrow port';
+      steerDirection.textContent = `TURN ${Math.abs(angleDiff).toFixed(0)}° PORT`;
+    }
   }
 
   toggleWaypointMode() {
@@ -434,6 +493,29 @@ class SailNavApp {
 
   hideLoading() {
     document.getElementById('loading').classList.add('hidden');
+  }
+
+  updateBoatCharacteristics() {
+    const length = parseFloat(document.getElementById('boat-length').value);
+    const type = document.getElementById('boat-type').value;
+
+    if (!isNaN(length)) {
+      this.polar.setBoatLength(length, type);
+      this.storage.saveSetting('boatLength', length);
+      this.storage.saveSetting('boatType', type);
+      document.getElementById('menu-panel').classList.add('hidden');
+    }
+  }
+
+  toggleSteeringDisplay(show) {
+    const display = document.getElementById('steering-display');
+    if (show) {
+      display.classList.remove('hidden');
+    } else {
+      display.classList.add('hidden');
+    }
+    this.steeringVisible = show;
+    this.storage.saveSetting('showSteering', show);
   }
 
   setWind() {

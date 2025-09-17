@@ -1,13 +1,95 @@
 export class BoatPolar {
   constructor() {
-    this.polarData = this.getDefaultPolar();
+    this.boatLength = 40; // feet (default for catamaran)
+    this.boatType = 'catamaran'; // 'monohull' or 'catamaran'
+    this.polarData = this.generatePolarFromLength(40, 'catamaran');
     this.customPolar = null;
   }
 
-  getDefaultPolar() {
+  setBoatLength(lengthFeet, type = 'catamaran') {
+    this.boatLength = lengthFeet;
+    this.boatType = type;
+    this.polarData = this.generatePolarFromLength(lengthFeet, type);
+  }
+
+  generatePolarFromLength(lengthFeet, type = 'catamaran') {
+    // Catamarans have different characteristics:
+    // - Higher potential speed (can exceed hull speed easier)
+    // - Better light wind performance
+    // - Can't point as high upwind (worse VMG angles)
+    // - More stable reaching speeds
+
+    const hullSpeed = type === 'catamaran'
+      ? 1.4 * Math.sqrt(lengthFeet)  // Cats can go faster
+      : 1.34 * Math.sqrt(lengthFeet); // Standard monohull formula
+
+    // Catamaran adjustments for Lagoon-style cruising cats
+    const catFactor = type === 'catamaran' ? {
+      upwindPenalty: 0.85,  // Can't point as high
+      reachingBonus: 1.15,  // Better on a reach
+      lightWindBonus: 1.2,  // Better in light air
+      speedPotential: 1.3   // Can exceed hull speed easier
+    } : {
+      upwindPenalty: 1,
+      reachingBonus: 1,
+      lightWindBonus: 1,
+      speedPotential: 1
+    };
+
+    const sizeFactor = Math.sqrt(lengthFeet / 40); // normalized to 40ft
+
     return {
-      name: 'Default 35ft Cruiser',
-      hullSpeed: 7.5, // knots
+      name: `${lengthFeet}ft ${type === 'catamaran' ? 'Catamaran' : 'Monohull'}`,
+      hullSpeed: hullSpeed,
+      angles: [0, 30, 50, 60, 75, 90, 110, 120, 135, 150, 165, 180], // Cats don't point as high, changed 45 to 50
+      speeds: {
+        // Light wind - cats excel here
+        5: [0, 0, 3.0 * sizeFactor * catFactor.lightWindBonus * catFactor.upwindPenalty,
+            3.8 * sizeFactor * catFactor.lightWindBonus, 4.2 * sizeFactor * catFactor.lightWindBonus,
+            4.5 * sizeFactor * catFactor.lightWindBonus * catFactor.reachingBonus,
+            4.3 * sizeFactor * catFactor.lightWindBonus * catFactor.reachingBonus,
+            3.8 * sizeFactor * catFactor.lightWindBonus, 3.2 * sizeFactor, 2.8 * sizeFactor, 2.3 * sizeFactor, 2.0 * sizeFactor],
+
+        10: [0, 0, 4.0 * sizeFactor * catFactor.upwindPenalty,
+             5.5 * sizeFactor, 6.2 * sizeFactor,
+             7.0 * sizeFactor * catFactor.reachingBonus,
+             7.5 * sizeFactor * catFactor.reachingBonus,
+             7.0 * sizeFactor * catFactor.reachingBonus,
+             6.0 * sizeFactor, 5.0 * sizeFactor, 4.2 * sizeFactor, 3.8 * sizeFactor],
+
+        15: [0, 0, 5.0 * sizeFactor * catFactor.upwindPenalty,
+             6.5 * sizeFactor, 7.2 * sizeFactor,
+             Math.min(8.5 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             Math.min(9.0 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             Math.min(8.5 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             7.5 * sizeFactor, 6.5 * sizeFactor, 6.0 * sizeFactor, 5.5 * sizeFactor],
+
+        20: [0, 0, 5.5 * sizeFactor * catFactor.upwindPenalty,
+             7.0 * sizeFactor, Math.min(8.0 * sizeFactor, hullSpeed),
+             Math.min(9.5 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             Math.min(10.0 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             Math.min(9.5 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             8.5 * sizeFactor, 7.5 * sizeFactor, 7.0 * sizeFactor, 6.5 * sizeFactor],
+
+        25: [0, 0, 5.2 * sizeFactor * catFactor.upwindPenalty,
+             6.8 * sizeFactor, Math.min(7.8 * sizeFactor, hullSpeed),
+             Math.min(9.0 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             Math.min(9.5 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             Math.min(9.0 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             8.2 * sizeFactor, 7.5 * sizeFactor, 7.2 * sizeFactor, 7.0 * sizeFactor],
+
+        30: [0, 0, 4.8 * sizeFactor * catFactor.upwindPenalty,
+             6.5 * sizeFactor, 7.5 * sizeFactor,
+             Math.min(8.5 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             Math.min(9.0 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             Math.min(8.5 * sizeFactor * catFactor.reachingBonus, hullSpeed * catFactor.speedPotential),
+             8.0 * sizeFactor, 7.5 * sizeFactor, 7.5 * sizeFactor, 7.5 * sizeFactor]
+      }
+    };
+  }
+
+  getDefaultPolar() {
+    return this.generatePolarFromLength(this.boatLength);
       angles: [0, 30, 45, 60, 75, 90, 110, 120, 135, 150, 165, 180],
       speeds: {
         5: [0, 0, 2.5, 3.2, 3.8, 4.2, 4.0, 3.5, 3.0, 2.5, 2.0, 1.8],
