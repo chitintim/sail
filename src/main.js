@@ -130,49 +130,67 @@ class SailNavApp {
       return;
     }
 
-    // Update loading screen to show GPS permission request
-    const loadingEl = document.getElementById('loading');
-    loadingEl.classList.remove('hidden'); // Ensure it's visible
-    loadingEl.innerHTML = `
-      <div class="loading-content">
-        <h2>Enable GPS</h2>
-        <p>To use navigation features, please allow location access</p>
-        <button id="enable-gps" class="action-btn primary" style="width: auto; padding: 12px 24px; margin-top: 20px; border-radius: 8px; font-size: 16px;">
-          Enable GPS
-        </button>
-        <div style="margin-top: 20px; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
-          <p style="font-size: 12px; color: var(--text-secondary);">
-            Safari will ask for permission after you tap the button
-          </p>
-        </div>
-        <div id="debug-info" style="margin-top: 20px; font-size: 10px; color: var(--text-secondary);"></div>
-      </div>
-    `;
+    // Try to get current position first to check if we already have permission
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        // We already have permission, skip the button and start GPS
+        console.log('GPS permission already granted, starting GPS');
+        this.setupGPS();
+        this.hideLoading();
+        this.map.centerOnPosition(position.coords.latitude, position.coords.longitude);
+      },
+      (error) => {
+        // Permission denied or error, show the enable button
+        console.log('GPS permission needed, showing button. Error:', error.code, error.message);
 
-    // Show debug info
-    const debugEl = document.getElementById('debug-info');
-    if (debugEl) {
-      debugEl.innerHTML = `
-        Protocol: ${window.location.protocol}<br>
-        Host: ${window.location.hostname}<br>
-        Geolocation: ${'geolocation' in navigator ? 'Available' : 'Not Available'}
-      `;
-    }
+        // Update loading screen to show GPS permission request
+        const loadingEl = document.getElementById('loading');
+        loadingEl.classList.remove('hidden');
+        loadingEl.innerHTML = `
+          <div class="loading-content">
+            <h2>Enable GPS</h2>
+            <p>To use navigation features, please allow location access</p>
+            <button id="enable-gps" class="action-btn primary" style="width: auto; padding: 12px 24px; margin-top: 20px; border-radius: 8px; font-size: 16px; background: #1e40af; color: white; border: none;">
+              Enable GPS
+            </button>
+            <button id="skip-gps" class="action-btn" style="width: auto; padding: 12px 24px; margin-top: 10px; border-radius: 8px; font-size: 14px;">
+              Continue Without GPS
+            </button>
+            <div style="margin-top: 20px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+              <p style="font-size: 12px; color: var(--text-secondary);">
+                Safari will ask for permission after you tap Enable GPS
+              </p>
+            </div>
+          </div>
+        `;
 
-    // Add click handler with a small delay to ensure DOM is ready
-    setTimeout(() => {
-      const enableBtn = document.getElementById('enable-gps');
-      if (enableBtn) {
-        console.log('Adding click listener to Enable GPS button');
-        enableBtn.addEventListener('click', () => {
-          console.log('Enable GPS button clicked');
-          this.requestGPSPermission();
-        });
-      } else {
-        console.error('Enable GPS button not found');
-        this.showGPSError('UI initialization error');
+        // Add click handlers
+        setTimeout(() => {
+          const enableBtn = document.getElementById('enable-gps');
+          const skipBtn = document.getElementById('skip-gps');
+
+          if (enableBtn) {
+            enableBtn.addEventListener('click', () => {
+              console.log('Enable GPS button clicked');
+              this.requestGPSPermission();
+            });
+          }
+
+          if (skipBtn) {
+            skipBtn.addEventListener('click', () => {
+              console.log('Skip GPS button clicked');
+              this.hideLoading();
+              // Set a default position (San Francisco Bay)
+              this.map.centerOnPosition(37.8095, -122.4095);
+            });
+          }
+        }, 100);
+      },
+      {
+        timeout: 1000, // Quick check, don't wait long
+        maximumAge: 0
       }
-    }, 100);
+    );
   }
 
   async requestGPSPermission() {
