@@ -122,18 +122,6 @@
           <button id="clear-route" class="menu-btn">Clear Route</button>
         </div>
         <div class="menu-section">
-          <h3>Wind</h3>
-          <div class="input-group">
-            <label for="wind-speed">Wind Speed (kts)</label>
-            <input type="number" id="wind-speed" min="0" max="50" step="1" value="10">
-          </div>
-          <div class="input-group">
-            <label for="wind-direction">Wind Direction (°)</label>
-            <input type="number" id="wind-direction" min="0" max="359" step="1" value="0">
-          </div>
-          <button id="set-wind" class="menu-btn">Set Wind</button>
-        </div>
-        <div class="menu-section">
           <h3>Boat Setup</h3>
           <div class="input-group">
             <label for="boat-length">Boat Length (ft)</label>
@@ -150,7 +138,6 @@
         </div>
         <div class="menu-section">
           <h3>Weather</h3>
-          <button id="fetch-weather" class="menu-btn">Update Weather</button>
           <label class="menu-toggle">
             <input type="checkbox" id="show-wind">
             <span>Show Wind Overlay</span>
@@ -159,11 +146,6 @@
             <input type="checkbox" id="auto-routing">
             <span>Wind Routing</span>
           </label>
-          <div class="input-group">
-            <label for="weather-api-key">OpenWeather API Key</label>
-            <input type="text" id="weather-api-key" placeholder="Enter API key">
-            <small style="color: var(--text-secondary); font-size: 0.75rem;">Get free key at openweathermap.org</small>
-          </div>
         </div>
         <div class="menu-section">
           <h3>Performance</h3>

@@ -1,52 +1,161 @@
 export class Weather {
   constructor() {
-    // OpenWeatherMap free tier API key (you'll need to replace with your own)
-    // Sign up at https://openweathermap.org/api
-    this.apiKey = 'YOUR_API_KEY_HERE';
     this.weatherData = null;
     this.windField = null;
+    this.forecastCache = new Map();
     this.lastFetch = null;
-    this.cacheTime = 30 * 60 * 1000; // 30 minutes cache
+    this.cacheTime = 3 * 60 * 60 * 1000; // 3 hours cache
   }
 
   async fetchWeatherData(lat, lon) {
-    // Check cache
-    if (this.lastFetch && Date.now() - this.lastFetch < this.cacheTime) {
-      return this.weatherData;
-    }
-
     try {
-      // For now, use OpenWeatherMap API (free tier allows 1000 calls/day)
-      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${this.apiKey}&units=metric`;
+      // Use NOAA's public WindFinder API proxy (no key needed)
+      // Alternative: OpenMeteo free weather API
+      const url = `https://api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wind_speed_10m,wind_direction_10m&forecast_days=2&wind_speed_unit=kn`;
 
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error('Weather fetch failed');
+        // Fallback to cached or estimated data
+        return this.estimateWind(lat, lon);
       }
 
       const data = await response.json();
 
+      // Parse the hourly forecast
+      const currentHour = new Date().getHours();
+      const windSpeed = data.hourly.wind_speed_10m[currentHour];
+      const windDirection = data.hourly.wind_direction_10m[currentHour];
+
       this.weatherData = {
         wind: {
-          speed: data.wind.speed * 1.94384, // Convert m/s to knots
-          direction: data.wind.deg,
-          gust: data.wind.gust ? data.wind.gust * 1.94384 : null
+          speed: windSpeed,
+          direction: windDirection,
+          gust: null
         },
-        pressure: data.main.pressure,
-        temp: data.main.temp,
-        humidity: data.main.humidity,
-        visibility: data.visibility,
-        clouds: data.clouds.all,
+        forecast: data.hourly,
+        source: 'openmeteo',
         timestamp: Date.now()
       };
 
       this.lastFetch = Date.now();
+      this.forecastCache.set(`${lat.toFixed(2)},${lon.toFixed(2)}`, this.weatherData);
+
       return this.weatherData;
     } catch (error) {
-      console.error('Weather fetch error:', error);
-      // Return last known data or default
-      return this.weatherData || this.getDefaultWind();
+      console.warn('Weather fetch failed, using estimation:', error);
+      return this.estimateWind(lat, lon);
     }
+  }
+
+  estimateWind(lat, lon) {
+    // Estimate wind based on typical patterns
+    // Trade winds, westerlies, etc.
+
+    // Tropical trade winds (0-30°)
+    if (Math.abs(lat) < 30) {
+      return {
+        wind: {
+          speed: 10 + Math.random() * 5,
+          direction: lat > 0 ? 60 : 120, // NE trades in north, SE in south
+        },
+        source: 'estimated',
+        timestamp: Date.now()
+      };
+    }
+
+    // Westerlies (30-60°)
+    if (Math.abs(lat) < 60) {
+      return {
+        wind: {
+          speed: 12 + Math.random() * 8,
+          direction: 270 + (Math.random() - 0.5) * 60,
+        },
+        source: 'estimated',
+        timestamp: Date.now()
+      };
+    }
+
+    // Polar easterlies
+    return {
+      wind: {
+        speed: 8 + Math.random() * 6,
+        direction: 90,
+      },
+      source: 'estimated',
+      timestamp: Date.now()
+    };
+  }
+
+  async getWindAtWaypoints(waypoints) {
+    // Get wind forecast at each waypoint for route planning
+    const windData = [];
+
+    for (const waypoint of waypoints) {
+      const weather = await this.fetchWeatherData(waypoint.lat, waypoint.lon);
+      windData.push({
+        waypoint: waypoint.name,
+        lat: waypoint.lat,
+        lon: waypoint.lon,
+        wind: weather.wind,
+        forecast: weather.forecast
+      });
+    }
+
+    return windData;
+  }
+
+  async getRouteWindForecast(route, estimatedSpeeds) {
+    // Calculate wind at each leg midpoint based on estimated arrival time
+    const forecast = [];
+    let cumulativeTime = 0;
+
+    for (let i = 0; i < route.waypoints.length - 1; i++) {
+      const from = route.waypoints[i];
+      const to = route.waypoints[i + 1];
+
+      // Midpoint of leg
+      const midLat = (from.lat + to.lat) / 2;
+      const midLon = (from.lon + to.lon) / 2;
+
+      // Estimated time to reach midpoint
+      const legDistance = this.calculateDistance(from.lat, from.lon, to.lat, to.lon);
+      const legTime = legDistance / (estimatedSpeeds?.[i] || 5); // hours
+      cumulativeTime += legTime / 2;
+
+      const weather = await this.fetchWeatherData(midLat, midLon);
+
+      // Get forecast for estimated arrival time
+      const forecastHour = Math.min(Math.round(cumulativeTime), 47); // 48 hour forecast max
+
+      forecast.push({
+        leg: `${from.name} to ${to.name}`,
+        midpoint: { lat: midLat, lon: midLon },
+        estimatedTime: cumulativeTime,
+        wind: weather.forecast ? {
+          speed: weather.forecast.wind_speed_10m[forecastHour],
+          direction: weather.forecast.wind_direction_10m[forecastHour]
+        } : weather.wind
+      });
+
+      cumulativeTime += legTime / 2;
+    }
+
+    return forecast;
+  }
+
+  calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 3440.065; // nautical miles
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
   }
 
   async fetchWindField(bounds) {

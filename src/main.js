@@ -83,10 +83,6 @@ class SailNavApp {
       this.map.setTrackUp(e.target.checked);
     });
 
-    document.getElementById('set-wind').addEventListener('click', () => {
-      this.setWind();
-    });
-
     document.getElementById('show-laylines').addEventListener('change', (e) => {
       this.toggleLaylines(e.target.checked);
     });
@@ -108,12 +104,6 @@ class SailNavApp {
     });
 
     // Weather controls
-    document.getElementById('fetch-weather').addEventListener('click', () => {
-      if (this.currentPosition) {
-        this.fetchWeatherData(this.currentPosition.lat, this.currentPosition.lon);
-      }
-    });
-
     document.getElementById('show-wind').addEventListener('change', (e) => {
       this.toggleWindOverlay();
     });
@@ -124,11 +114,6 @@ class SailNavApp {
       if (e.target.checked) {
         this.updateRoutingWithWind();
       }
-    });
-
-    document.getElementById('weather-api-key').addEventListener('change', (e) => {
-      this.weather.apiKey = e.target.value;
-      this.storage.saveSetting('weatherApiKey', e.target.value);
     });
 
     this.map.onMapClick((lat, lon) => {
@@ -302,8 +287,8 @@ class SailNavApp {
           data.cog
         );
 
-        // Fetch weather data periodically (every 30 minutes or on significant movement)
-        if (!this.lastWeatherFetch || Date.now() - this.lastWeatherFetch > 30 * 60 * 1000) {
+        // Fetch weather automatically every 3 hours
+        if (!this.lastWeatherFetch || Date.now() - this.lastWeatherFetch > 3 * 60 * 60 * 1000) {
           this.fetchWeatherData(data.position.lat, data.position.lon);
         }
 
@@ -538,11 +523,6 @@ class SailNavApp {
       this.map.setTrackUp(true);
     }
 
-    if (settings.weatherApiKey) {
-      this.weather.apiKey = settings.weatherApiKey;
-      document.getElementById('weather-api-key').value = settings.weatherApiKey;
-    }
-
     if (settings.windRouting) {
       this.windRoutingEnabled = settings.windRouting;
       document.getElementById('auto-routing').checked = settings.windRouting;
@@ -583,9 +563,17 @@ class SailNavApp {
     if (!isNaN(speed) && !isNaN(direction)) {
       this.wind.setWind(speed, direction);
 
+      // Also update weather system with manual wind
+      this.weather.setManualWind(speed, direction);
+
       // Update wind arrow on map
       if (this.currentPosition) {
         this.map.updateWindArrow(direction, this.currentPosition.lat, this.currentPosition.lon);
+      }
+
+      // Update wind overlay if visible
+      if (this.windOverlayVisible) {
+        this.updateWindOverlay();
       }
 
       // Update laylines if active waypoint
@@ -663,21 +651,36 @@ class SailNavApp {
 
         // Update wind overlay if visible
         if (this.windOverlayVisible) {
-          const bounds = this.map.leafletMap.getBounds();
-          const windField = await this.weather.fetchWindField({
-            north: bounds.getNorth(),
-            south: bounds.getSouth(),
-            east: bounds.getEast(),
-            west: bounds.getWest()
-          });
-          this.windOverlay.setWindData(windField);
+          await this.updateWindOverlay();
         }
 
         // Update display with wind info
         this.updateWindDisplay(weatherData.wind);
+
+        // If we have a route, get wind forecast for waypoints
+        if (this.navigation.waypoints.length > 0) {
+          const routeForecast = await this.weather.getRouteWindForecast(
+            this.navigation.getRoute(),
+            [this.currentPosition?.sog || 5]
+          );
+          console.log('Route wind forecast:', routeForecast);
+        }
       }
     } catch (error) {
       console.error('Weather fetch error:', error);
+    }
+  }
+
+  async updateWindOverlay() {
+    if (this.windOverlayVisible && this.weather.weatherData) {
+      const bounds = this.map.leafletMap.getBounds();
+      const windField = await this.weather.fetchWindField({
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest()
+      });
+      this.windOverlay.setWindData(windField);
     }
   }
 
@@ -726,10 +729,8 @@ class SailNavApp {
     this.windOverlayVisible = !this.windOverlayVisible;
 
     if (this.windOverlayVisible) {
-      // Fetch fresh wind data
-      if (this.currentPosition) {
-        this.fetchWeatherData(this.currentPosition.lat, this.currentPosition.lon);
-      }
+      // Use manual wind data
+      this.updateWindOverlay();
       this.windOverlay.show();
     } else {
       this.windOverlay.hide();
