@@ -26,8 +26,8 @@ class SailNavApp {
 
     this.setupEventListeners();
 
-    // Request GPS permission on user interaction for iOS
-    this.setupGPSPermission();
+    // Show the GPS permission UI immediately
+    this.showGPSPermissionUI();
   }
 
   setupEventListeners() {
@@ -110,87 +110,58 @@ class SailNavApp {
     });
   }
 
-  setupGPSPermission() {
-    console.log('Setting up GPS permission...');
-    console.log('Location:', window.location.href);
-    console.log('Protocol:', window.location.protocol);
-    console.log('Geolocation available:', 'geolocation' in navigator);
+  showGPSPermissionUI() {
+    // Don't check anything first, just show the UI immediately
+    const loadingEl = document.getElementById('loading');
 
-    // Check if geolocation is available
-    if (!('geolocation' in navigator)) {
-      console.error('Geolocation not supported');
-      this.showGPSError('GPS not supported on this device');
-      return;
-    }
+    // Always show the permission UI right away
+    loadingEl.innerHTML = `
+      <div class="loading-content">
+        <h2>Sail Navigation</h2>
+        <p>Enable GPS for real-time navigation</p>
+        <button id="enable-gps" onclick="window.app.startWithGPS()" style="width: 200px; padding: 16px 24px; margin-top: 20px; border-radius: 8px; font-size: 18px; background: #1e40af; color: white; border: none; cursor: pointer;">
+          Enable GPS
+        </button>
+        <button id="skip-gps" onclick="window.app.startWithoutGPS()" style="width: 200px; padding: 14px 24px; margin-top: 10px; border-radius: 8px; font-size: 16px; background: #6b7280; color: white; border: none; cursor: pointer;">
+          Continue Without GPS
+        </button>
+      </div>
+    `;
+  }
 
-    // Check if we're on HTTPS (required for geolocation)
-    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-      console.error('Not on HTTPS');
-      this.showGPSError('GPS requires HTTPS. Please use https:// URL');
-      return;
-    }
+  startWithGPS() {
+    console.log('Starting with GPS...');
+    const loadingEl = document.getElementById('loading');
+    loadingEl.innerHTML = `
+      <div class="loading-spinner"></div>
+      <p>Requesting GPS permission...</p>
+    `;
 
-    // Try to get current position first to check if we already have permission
+    // Request GPS permission
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        // We already have permission, skip the button and start GPS
-        console.log('GPS permission already granted, starting GPS');
+        console.log('GPS enabled successfully');
         this.setupGPS();
         this.hideLoading();
         this.map.centerOnPosition(position.coords.latitude, position.coords.longitude);
       },
       (error) => {
-        // Permission denied or error, show the enable button
-        console.log('GPS permission needed, showing button. Error:', error.code, error.message);
-
-        // Update loading screen to show GPS permission request
-        const loadingEl = document.getElementById('loading');
-        loadingEl.classList.remove('hidden');
-        loadingEl.innerHTML = `
-          <div class="loading-content">
-            <h2>Enable GPS</h2>
-            <p>To use navigation features, please allow location access</p>
-            <button id="enable-gps" class="action-btn primary" style="width: auto; padding: 12px 24px; margin-top: 20px; border-radius: 8px; font-size: 16px; background: #1e40af; color: white; border: none;">
-              Enable GPS
-            </button>
-            <button id="skip-gps" class="action-btn" style="width: auto; padding: 12px 24px; margin-top: 10px; border-radius: 8px; font-size: 14px;">
-              Continue Without GPS
-            </button>
-            <div style="margin-top: 20px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
-              <p style="font-size: 12px; color: var(--text-secondary);">
-                Safari will ask for permission after you tap Enable GPS
-              </p>
-            </div>
-          </div>
-        `;
-
-        // Add click handlers
-        setTimeout(() => {
-          const enableBtn = document.getElementById('enable-gps');
-          const skipBtn = document.getElementById('skip-gps');
-
-          if (enableBtn) {
-            enableBtn.addEventListener('click', () => {
-              console.log('Enable GPS button clicked');
-              this.requestGPSPermission();
-            });
-          }
-
-          if (skipBtn) {
-            skipBtn.addEventListener('click', () => {
-              console.log('Skip GPS button clicked');
-              this.hideLoading();
-              // Set a default position (San Francisco Bay)
-              this.map.centerOnPosition(37.8095, -122.4095);
-            });
-          }
-        }, 100);
+        console.error('GPS error:', error);
+        this.showGPSError(`GPS Error: ${error.message}. You can retry or continue without GPS.`);
       },
       {
-        timeout: 1000, // Quick check, don't wait long
+        enableHighAccuracy: true,
+        timeout: 10000,
         maximumAge: 0
       }
     );
+  }
+
+  startWithoutGPS() {
+    console.log('Starting without GPS...');
+    this.hideLoading();
+    // Set a default position (San Francisco Bay)
+    this.map.centerOnPosition(37.8095, -122.4095);
   }
 
   async requestGPSPermission() {
@@ -263,29 +234,19 @@ class SailNavApp {
     loadingEl.classList.remove('hidden');
     loadingEl.innerHTML = `
       <div class="loading-content">
-        <h2>Location Required</h2>
+        <h2>GPS Issue</h2>
         <p style="margin: 20px 0;">${message}</p>
-        <button id="retry-gps" class="action-btn primary" style="width: auto; padding: 12px 24px; margin-top: 20px; border-radius: 8px;">
+        <button onclick="window.app.startWithGPS()" style="width: 200px; padding: 16px 24px; margin-top: 20px; border-radius: 8px; font-size: 18px; background: #1e40af; color: white; border: none; cursor: pointer;">
           Try Again
         </button>
-        <div style="margin-top: 30px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
-          <p style="font-size: 14px; font-weight: bold; margin-bottom: 10px;">To enable location:</p>
-          <ol style="text-align: left; font-size: 13px; line-height: 1.6;">
-            <li>Open iPhone Settings</li>
-            <li>Scroll to Safari</li>
-            <li>Tap Location</li>
-            <li>Select "While Using App"</li>
-            <li>Return here and tap "Try Again"</li>
-          </ol>
+        <button onclick="window.app.startWithoutGPS()" style="width: 200px; padding: 14px 24px; margin-top: 10px; border-radius: 8px; font-size: 16px; background: #6b7280; color: white; border: none; cursor: pointer;">
+          Continue Without GPS
+        </button>
+        <div style="margin-top: 30px; padding: 15px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+          <p style="font-size: 12px;">Settings > Safari > Location > While Using App</p>
         </div>
       </div>
     `;
-
-    setTimeout(() => {
-      document.getElementById('retry-gps')?.addEventListener('click', () => {
-        this.requestGPSPermission();
-      });
-    }, 100);
   }
 
   setupGPS() {
@@ -613,6 +574,7 @@ class SailNavApp {
 }
 
 const app = new SailNavApp();
+window.app = app; // Make it globally accessible for onclick handlers
 app.init().catch(console.error);
 
 // Service worker registration disabled for development
