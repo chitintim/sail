@@ -80,6 +80,18 @@ class SailNavApp {
       }
     });
 
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      const menuPanel = document.getElementById('menu-panel');
+      const menuBtn = document.getElementById('menu-btn');
+      if (menuPanel && !menuPanel.classList.contains('hidden')) {
+        // Check if click is outside menu panel and not on menu button
+        if (!menuPanel.contains(e.target) && e.target !== menuBtn && !menuBtn.contains(e.target)) {
+          menuPanel.classList.add('hidden');
+        }
+      }
+    });
+
     addListener('waypoint-btn', 'click', () => {
       console.log('Waypoint button clicked');
       this.toggleWaypointMode();
@@ -617,6 +629,10 @@ class SailNavApp {
   setNightMode(enabled) {
     document.documentElement.setAttribute('data-theme', enabled ? 'dark' : 'light');
     this.storage.saveSetting('nightMode', enabled);
+    // Update map tiles for night mode
+    if (this.map) {
+      this.map.setNightMode(enabled);
+    }
   }
 
   async loadSettings() {
@@ -635,6 +651,12 @@ class SailNavApp {
     if (settings.windRouting) {
       this.windRoutingEnabled = settings.windRouting;
       document.getElementById('auto-routing').checked = settings.windRouting;
+    }
+
+    // Default steering guide to on if not previously set
+    if (settings.showSteering === undefined || settings.showSteering) {
+      document.getElementById('show-steering').checked = true;
+      this.toggleSteeringDisplay(true);
     }
   }
 

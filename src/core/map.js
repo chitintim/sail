@@ -12,6 +12,9 @@ export class MapController {
     this.centerOnBoat = false; // Don't auto-center by default
     this.laylines = null;
     this.windArrow = null;
+    this.baseTileLayer = null;
+    this.seaMarkLayer = null;
+    this.nightMode = false;
   }
 
   init(initialLat = 37.7749, initialLon = -122.4194) {
@@ -25,12 +28,13 @@ export class MapController {
       position: 'topright'
     }).addTo(this.map);
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Store tile layers for switching
+    this.baseTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap',
       maxZoom: 19
     }).addTo(this.map);
 
-    L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+    this.seaMarkLayer = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
       attribution: '© OpenSeaMap',
       opacity: 0.8,
       maxZoom: 19
@@ -166,6 +170,39 @@ export class MapController {
 
   getMap() {
     return this.map;
+  }
+
+  setNightMode(enabled) {
+    this.nightMode = enabled;
+
+    // Remove current layers
+    if (this.baseTileLayer) {
+      this.map.removeLayer(this.baseTileLayer);
+    }
+
+    // Add appropriate tile layer based on night mode
+    if (enabled) {
+      // Use a dark tile provider for night mode
+      this.baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors © CARTO',
+        maxZoom: 19,
+        subdomains: 'abcd'
+      }).addTo(this.map);
+    } else {
+      // Use standard OpenStreetMap for day mode
+      this.baseTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+      }).addTo(this.map);
+    }
+
+    // Move basemap to back
+    this.baseTileLayer.setZIndex(0);
+
+    // Ensure sea marks stay on top
+    if (this.seaMarkLayer) {
+      this.seaMarkLayer.setZIndex(1);
+    }
   }
 
   updateLaylines(laylineData, boatLat, boatLon) {
